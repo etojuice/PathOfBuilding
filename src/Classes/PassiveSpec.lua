@@ -12,6 +12,8 @@ local m_min = math.min
 local m_max = math.max
 local m_floor = math.floor
 local b_lshift = bit.lshift
+local b_rshift = bit.rshift
+local b_and = bit.band
 
 local PassiveSpecClass = newClass("PassiveSpec", "UndoHandler", function(self, build, treeVersion)
 	self.UndoHandler()
@@ -168,8 +170,11 @@ function PassiveSpecClass:Save(xml)
 		t_insert(allocNodeIdList, nodeId)
 	end
 	local masterySelections = { }
-	for mastery, effect in pairs(self.masterySelections) do
-		t_insert(masterySelections, "{"..mastery..","..effect.."}")
+	local masteryEffectsCount = 1
+	for node, effect in pairs(self.masterySelections) do
+		local effectPair = b_lshift(effect, 16) + node
+		masterySelections[masteryEffectsCount] = effectPair
+		masteryEffectsCount = masteryEffectsCount + 1
 	end
 	local editedNodes = {
 		elem = "EditedNodes"
@@ -201,6 +206,7 @@ function PassiveSpecClass:Save(xml)
 		classId = tostring(self.curClassId), 
 		ascendClassId = tostring(self.curAscendClassId), 
 		nodes = table.concat(allocNodeIdList, ","),
+		-- FIXME
 		masteryEffects = table.concat(masterySelections, ",")
 	}
 	t_insert(xml, {
@@ -249,8 +255,10 @@ function PassiveSpecClass:ImportFromNodeList(classId, ascendClassId, hashList, m
 		end
 	end
 	wipeTable(self.masterySelections)
-	for mastery, effect in pairs(masteryEffects) do
-		self.masterySelections[mastery] = effect
+	for _, effectPair in pairs(masteryEffects) do
+		local nodeHash = b_and(effectPair, 0xffff)
+		local effectHash = b_rshift(effectPair, 16)
+		self.masterySelections[nodeHash] = effectHash
 	end
 	self:SelectAscendClass(ascendClassId)
 end
